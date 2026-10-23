@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PROVIDER
+  CUSTOMER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role
+  created_at DateTime @default(now())
+
+  // Relations
+  availabilities     Availability[]
+  providedAppointments Appointment[] @relation("ProviderAppointments")
+  bookedAppointments Appointment[] @relation("CustomerAppointments")
+
+  @@map("users")
+  @@index([email])
+}
+
+model Service {
+  id               String   @id @default(uuid())
+  name             String
+  description      String?
+  duration_minutes Int      @db.SmallInt
+  price            Decimal  @db.Decimal(10, 2)
+  created_at       DateTime @default(now())
+
+  // Relations
+  appointments Appointment[]
+
+  @@map("services")
+}
+
+model Availability {
+  id          String    @id @default(uuid())
+  provider_id String
+  day_of_week Int       // 0 = Sunday, 6 = Saturday
+  start_time  DateTime  // Stored with date component unused, represents time of day
+  end_time    DateTime  // Stored with date component unused, represents time of day
+  break_start DateTime? // Optional break time
+  break_end   DateTime? // Optional break end time
+  created_at  DateTime  @default(now())
+
+  // Relations
+  provider          User            @relation(fields: [provider_id], references: [id], onDelete: Cascade)
+  unavailable_dates UnavailableDate[]
+
+  @@map("availabilities")
+  @@index([provider_id])
+  @@index([provider_id, day_of_week])
+}
+
+model UnavailableDate {
+  id             String       @id @default(uuid())
+  availability_id String
+  date           DateTime     // Full date, time component unused
+  reason         String?
+  created_at     DateTime     @default(now())
+
+  // Relations
+  availability Availability @relation(fields: [availability_id], references: [id], onDelete: Cascade)
+
+  @@map("unavailable_dates")
+  @@index([availability_id])
+  @@index([availability_id, date])
+}
+
+model Appointment {
+  id          String           @id @default(uuid())
+  customer_id String
+  provider_id String
+  service_id  String
+  start_time  DateTime
+  end_time    DateTime
+  status      AppointmentStatus
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+
+  // Relations
+  customer User    @relation("CustomerAppointments", fields: [customer_id], references: [id])
+  provider User    @relation("ProviderAppointments", fields: [provider_id], references: [id])
+  service  Service @relation(fields: [service_id], references: [id])
+
+  @@map("appointments")
+  @@index([customer_id])
+  @@index([provider_id])
+  @@index([service_id])
+  @@index([status])
+  @@index([provider_id, start_time, status])
+}
