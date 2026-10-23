@@ -18,7 +18,7 @@ build/
 .env.development
 
 # Prisma
-prisma/migrations/
+# prisma/migrations/  # Track migrations for deployment
 
 # IDE
 .vscode/
